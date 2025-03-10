@@ -3,7 +3,7 @@ title: "Exercise 2: Crops"
 output: pdf_document
 ---
 # Exercise 2: Crops 
-```{r}
+```{r, echo=F}
 crops <- read.table("../data/crops.txt", header = TRUE)
 crops_frame <- data.frame(crops)
 yes_filter <- data.frame(match = c("yes"))
@@ -25,7 +25,7 @@ anova(county_related_anova)
 
 The p-value here is given by the `Pr(>F)` column. For the Related and County factors separately, the p-value is not below 0.05, which means that a linear relation between these factors and the crop yield cannot be conclusively established. This is also true for the interaction between County and Related. As the two-way ANOVA assumes the data is normally distributed, we have to asses the normality of the data.
 
-```{r, fig.height=3, fig.width=6}
+```{r, fig.height=3, fig.width=6, echo=F}
 par(mfrow=c(1,2))
 p1 <- qqnorm(residuals(county_related_anova))
 qqline(residuals(county_related_anova))
@@ -56,21 +56,70 @@ Now we want to take the size of the farm into account.
 
 ```{r}
 drop1(ancova_county_lm, test = "F")
-summary(ancova_county_lm)
 ```
 
 This ANCOVA shows that the size of the farm is strongly correlated with the yield of a farm, which can be seen in the low p-value of $4.5\cdot 10^{-10}$. The county does no appear to have a significant effect here, as the p-value is to high. The data for the size and related status looks similar:
 
 ```{r}
 drop1(ancova_related_lm, test = "F")
-summary(ancova_related_lm)
 ```
-While the correlation between crop yield and farm size is significant, the related status does not appear to have an effect.
+While the correlation between crop yield and farm size is significant, the related status does not appear to have an effect. These results lead us to conclude that the effect of county and relation on the influence of size is negligible. However, as the p-value for related is the smallest, this would be the most appropriate model for this dataset.
 
-```{r, fig.height=3, fig.width=6}
-qqplot(residuals(ancova_county_lm))
+```{r, fig.height=3, fig.width=6, echo=F}
+par(mfrow=c(1,2))
+plot(fitted(ancova_county_lm), residuals(ancova_county_lm))
+plot(fitted(ancova_related_lm), residuals(ancova_related_lm))
+```
+
+As ANCOVA assumes that the underlying data is normally distributed, we will have to check for normality. Both of the above residual plots show no obvious correlation in the variance of the residuals, which implies a normal distribution.
+
+```{r, fig.height=3, fig.width=6, echo=F}
+par(mfrow=c(1,2))
+qqnorm(residuals(ancova_county_lm))
 qqline(residuals(ancova_county_lm))
-qqplot(residuals(ancova_related_lm))
+qqnorm(residuals(ancova_related_lm))
 qqline(residuals(ancova_related_lm))
 ```
-As ANCOVA assumes that the underlying data is normally distributed, we will have to check for normality. 
+The Q-Q plots above show the points roughly in a straight line. This implies that the underlying data is normally distributed.
+
+## Part C 
+```{r}
+inter_relation <- lm(Crops ~ Size * Related, data=crops_frame)
+anova(inter_relation)
+summary(inter_relation) 
+```
+In this model, the county factor has no effect on the crop yield. The model can be described as 
+$$
+Y_{ik}=\mu + \alpha_{i} + \beta_{i}X_{ik} + e_{ik}
+$$
+where $\mu$ is the average of the total population, $\alpha_{i}$ is the effects of all the related factor and $\beta_{i}$ is the effect of the interaction between size and related. From the summary above, we can find that 
+
+- The average $\mu \approx 1775$
+- The factor related $\alpha_{i} \approx -1584$ if the tenant and landlord are related
+- The interaction $\beta_{i} \approx 6.274$
+- The relation between plot size and crop yield $X_{ik} = \gamma \cdot x_{ik}$ where 
+  - $x_{ik}$ is the size of the plot and 
+  - $\gamma \approx 28.21$
+
+However, it is important to note that the effect of related is not statistically significant. This may indicate that a simpler model may be sufficient to describe the crop yields of these farms.
+
+## Part D 
+Combining the results from the previous two sections, we can create a numerical model for the crop yield of a farm. For a farm of county 2 of size 165 with relation to the landlord,  
+$$
+Y_{ik}=1775 + -1584 + 6.274 \cdot 28.21 \cdot 165 = 
+$$
+```{r, echo=F}
+1775 + -1584 + 6.274 * 28.21 * 165
+```
+
+Which does not appear to be a likely result. The error variance for this value is 
+```{r, echo=F}
+sqrt( (190.2)^2 + (1227)^2 + (6.327)^2 * (4.841)^2 )
+```
+
+
+A more probable result could be obtained by ignoring the effects of relation:
+
+```{r}
+1775 + 28.21 * 165
+```

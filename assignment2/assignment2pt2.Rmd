@@ -1,0 +1,113 @@
+---
+title: "Military Coups"
+output: html_notebook
+---
+
+
+```{r,echo = FALSE}
+rm(list = ls())
+library(tidyverse)
+theme_set(theme_minimal())
+```
+
+```{r, echo=FALSE}
+library(broom)
+library(gt)
+```
+(a) We read the data set from coups.txt file and is stored in the variable data. Convert political liberalization levels into a factor, we treat it as a categorical variable. We also inspect the variable data 
+
+```{r, echo=FALSE}
+data <- read.table("coups.txt", header = TRUE, sep = "", stringsAsFactors = FALSE)
+data$pollib <- as.factor(data$pollib)
+glimpse(data)
+```
+We perform a Poisson regression analysis on the dataset and display a summary of the model
+```{r, echo=FALSE}
+# Perform Poisson regression
+poisson_model <- glm(miltcoup ~ oligarchy + pollib + parties + pctvote + popn + size + numelec + numregim, 
+                     data = data, 
+                     family = poisson)
+
+# View model summary
+summary(poisson_model)
+
+```
+The Poisson regression model shows that oligarchy, pollib2, and parties are significant predictors of military coups (p < 0.05). Specifically, more years of military oligarchy and more legal political parties increase coups, while higher political liberalization (pollib2) reduces coups. Non-significant predictors (pctvote, popn, size, etc.) can be considered for removal to simplify the model.
+
+(b)
+We start reducing the explanatory variables in the model by using the step down approach
+```{r, echo=FALSE}
+reduced_model_1 <- glm(miltcoup ~ oligarchy + pollib + parties + pctvote + popn + size + numregim, 
+                       data = data, 
+                       family = poisson(link = "log"))
+summary(reduced_model_1)
+  
+```
+Number of legislative and presidential elections  has a p-value of $0.670$ so we remove it from the model and re-evaluate the mode we keep on doing this till we can no longer eliminate any other variable
+Iteratively we remove the explanatory variables (in order) number of regime types, area in 1000 square km, population in millions in 1989.
+
+```{r, echo=FALSE}
+reduced_model_4 <- glm(miltcoup ~ oligarchy + pollib + parties + pctvote, 
+                       data = data, 
+                       family = poisson(link = "log"))
+summary(reduced_model_4)
+```
+The next variable to remove is a categorical variable.We recode the pollib variable to combine levels 0 and 1 into a single group (0) and treat level 2 as a separate group (1). This simplifies the model by focusing on the significant difference between pollib = 2 (higher political liberalization) and the combined group of pollib = 0 and 1 (lower liberalization), while reducing complexity and improving interpretability.
+```{r, echo=FALSE}
+data$pollib_recoded <- ifelse(data$pollib == 2, 1, 0)
+
+recoded_model <- glm(miltcoup ~ oligarchy + pollib_recoded + parties + pctvote, 
+                   data = data, 
+                   family = poisson(link = "log"))
+summary(recoded_model)
+```
+The we remove the  variable percent voting in last election since it is insignificant p-value= $0.255$ 
+```{r, echo=FALSE}
+final_model <- glm(miltcoup ~ oligarchy + pollib_recoded + parties, 
+                           data = data, 
+                           family = poisson(link = "log"))
+summary(final_model)
+```
+The final model simplifies the initial model by retaining only significant predictors (oligarchy, pollib_recoded, parties). Both models show that oligarchy and parties increase coups, while pollib_recoded (or pollib2 in the initial model) reduces coups.The final model has a lower AIC ($106.63$ vs. $113.06$), indicating a better balance of fit and simplicity. Removing non-significant predictors improves interpretability without sacrificing key insights.
+
+(c)We find the expected number of Coups for different Political Liberalization levels we consider pollibs 0 and 1 to not have any significant difference
+```{r, echo=FALSE}
+
+avg_oligarchy <- mean(data$oligarchy)
+avg_parties <- mean(data$parties)
+
+cat("Average oligarchy:", avg_oligarchy, "\n")
+cat("Average parties:", avg_parties, "\n")
+```
+```{r, echo=FALSE}
+predict_coups <- function(oligarchy, parties, pollib_recoded) {
+
+  linear_predictor <- coefficients["(Intercept)"] + 
+                      coefficients["oligarchy"] * oligarchy + 
+                      coefficients["pollib_recoded"] * pollib_recoded + 
+                      coefficients["parties"] * parties
+  
+
+  predicted_coups <- exp(linear_predictor)
+  
+  return(predicted_coups)
+}
+```
+```{r, echo=FALSE}
+coefficients <- coef(final_model)
+predicted_coups_0 <- predict_coups(oligarchy = avg_oligarchy, 
+                                   parties = avg_parties, 
+                                   pollib_recoded = 0)
+
+predicted_coups_1 <- predict_coups(oligarchy = avg_oligarchy, 
+                                   parties = avg_parties, 
+                                   pollib_recoded = 1)
+
+cat("Predicted number of coups for None or Limited Civil Rights):", predicted_coups_0, "\n")
+cat("Predicted number of coups for Full Civil Rights:", predicted_coups_1, "\n")
+```
+Countries with full civil rights (pollib_recoded = 1) are predicted to have fewer military coups $(0.969)$ compared to those with none or limited civil rights (pollib_recoded = 0, $1.985$ coups). oligarchy and parties increase coups, while pollib_recoded significantly reduces them.
+
+
+
+

@@ -1,0 +1,7 @@
+---
+title: "Experimental Design and Data Analysis: Assignment 2"
+site: bookdown::bookdown_site
+output:
+  bookdown::pdf_document2:
+    toc: yes
+---

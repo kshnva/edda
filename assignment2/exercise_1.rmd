@@ -1,0 +1,92 @@
+---
+title: "Exercise 1: Titanic"
+output: pdf_document
+---
+# Exercise 1: Titanic 
+```{r, echo=FALSE}
+# nolint start: indentation_linter.
+data <- read.table("../data/titanic.txt", header = TRUE)
+data <- data.frame(data)
+data$PClass <- factor(data$PClass)
+data$Sex <- factor(data$Sex)
+
+data_not_na <- data[!is.na(data$Age), ]
+data_na <- data[is.na(data$Age), ]
+age <- data_na$Age
+p_class <- data$PClass
+sex <- data$Sex
+survived <- data$Survived
+```
+
+## Part A
+```{r, echo=FALSE}
+colors <- c("green", "orange", "brown")
+plot_labels <- c("Age defined", "Class", "Sex")
+
+par(mfrow = c(1, 4))
+par(mar = c(2, 2, 4, 2), cex = 0.75)
+barplot(
+    matrix(c(
+        sum(survived == 1), sum(survived == 0)
+    ), ncol = 1),
+    names.arg = "Survived",
+    col = colors,
+    beside = TRUE,
+    ylim = c(0, 1000)
+)
+legend(x = "topleft", fill = colors, legend = c("Survived", "Died"))
+barplot(
+    matrix(c(
+        sum(sex == "male"), sum(sex == "female")
+    ), ncol = 1),
+    names.arg = "Sex",
+    col = colors,
+    beside = TRUE,
+    ylim = c(0, 1000)
+)
+legend(x = "topleft", fill = colors, legend = c("Male", "Female"))
+barplot(
+    matrix(c(length(data_not_na$Age), length(data_na$Age)), ncol = 1),
+    names.arg = "Age",
+    col = colors,
+    beside = TRUE,
+    ylim = c(0, 1000)
+)
+legend(x = "topleft", fill = colors, legend = c("Available", "Missing"))
+barplot(
+    matrix(c(
+        sum(p_class == "1st"), sum(p_class == "2nd"),
+        sum(p_class == "3rd")
+    ), ncol = 1),
+    names.arg = "Class",
+    col = colors,
+    beside = TRUE,
+    ylim = c(0, 1000)
+)
+legend(x = "topleft", fill = colors, legend = c("1st", "2nd", "3rd"))
+mtext("Titanic data summary", side = 3, line = -2, outer = TRUE)
+```
+
+```{R, fig.asp = .3, echo=FALSE}
+par(mfrow = c(1, 1))
+par(mar = c(2, 1, 1.5, 1))
+boxplot(matrix(c(data_not_na$Age)), horizontal = TRUE, hight = 1)
+mtext("Known age distribution", side = 3, line = -1, outer = TRUE)
+```
+The data for this exercise is a part of the passenger manifest for the Titanic. The dataset covers the names, passenger class, survival status and, when available, the age of 1313 passengers. A summary of the data is given above. Because the age of some passengers is unavailable, we will use a which does not include these passengers when their age is required. 
+
+```{R}
+age_glm <- glm(Survived ~ Age, data = data_not_na, family=binomial)
+summary(age_glm)
+sex_glm <- glm(Survived ~ Sex, data = data, family=binomial)
+summary(sex_glm)
+exp(0.69315-2.30118)
+cls_glm <- glm(Survived ~ PClass, data = data, family=binomial)
+summary(cls_glm)
+exp(0.4029-0.7052)
+exp(0.4029-1.8265)
+```
+
+```{r, echo=F}
+# nolint end
+```
