@@ -4,4 +4,5 @@ site: bookdown::bookdown_site
 output:
   bookdown::pdf_document2:
     toc: yes
+rmd_files: ["exercise_1.rmd", "assignment2pt2.Rmd", "3.rmd"]
 ---

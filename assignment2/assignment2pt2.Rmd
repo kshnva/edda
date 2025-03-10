@@ -1,6 +1,6 @@
 ---
-title: "Military Coups"
-output: html_notebook
+title: "Exercise 2: Military coups"
+output: pdf_document
 ---
 
 
@@ -17,7 +17,7 @@ library(gt)
 (a) We read the data set from coups.txt file and is stored in the variable data. Convert political liberalization levels into a factor, we treat it as a categorical variable. We also inspect the variable data 
 
 ```{r, echo=FALSE}
-data <- read.table("coups.txt", header = TRUE, sep = "", stringsAsFactors = FALSE)
+data <- read.table("../data/coups.txt", header = TRUE, sep = "", stringsAsFactors = FALSE)
 data$pollib <- as.factor(data$pollib)
 glimpse(data)
 ```
@@ -107,7 +107,3 @@ cat("Predicted number of coups for None or Limited Civil Rights):", predicted_co
 cat("Predicted number of coups for Full Civil Rights:", predicted_coups_1, "\n")
 ```
 Countries with full civil rights (pollib_recoded = 1) are predicted to have fewer military coups $(0.969)$ compared to those with none or limited civil rights (pollib_recoded = 0, $1.985$ coups). oligarchy and parties increase coups, while pollib_recoded significantly reduces them.
-
-
-
-

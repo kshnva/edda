@@ -75,17 +75,91 @@ mtext("Known age distribution", side = 3, line = -1, outer = TRUE)
 ```
 The data for this exercise is a part of the passenger manifest for the Titanic. The dataset covers the names, passenger class, survival status and, when available, the age of 1313 passengers. A summary of the data is given above. Because the age of some passengers is unavailable, we will use a which does not include these passengers when their age is required. 
 
+Because the survival outcome is binary, logistic models are the best tool to study how the different factors and numerical variables impact the survival chance. To start, we will fit some simple logistic regression models to study the linear relation between the survival chance of the passengers and their age, sex and passenger class. 
+
+### Age
 ```{R}
 age_glm <- glm(Survived ~ Age, data = data_not_na, family=binomial)
-summary(age_glm)
-sex_glm <- glm(Survived ~ Sex, data = data, family=binomial)
-summary(sex_glm)
-exp(0.69315-2.30118)
-cls_glm <- glm(Survived ~ PClass, data = data, family=binomial)
-summary(cls_glm)
-exp(0.4029-0.7052)
-exp(0.4029-1.8265)
+coefficients(age_glm)
+drop1(age_glm, test="Chisq")
 ```
+This model does not suggest that a significant relation exists between the age of the passenger and their survival outcome. As an example, the odds of survival for a 55 year old passenger would, according to this model, be 
+```{R}
+exp(-0.081428 - 0.008795*55)
+```
+but a 25 year old would have higher odds at
+```{R}
+exp(-0.081428 - 0.008795*25)
+```
+
+### Sex
+```{R}
+sex_glm <- glm(Survived ~ Sex, data = data, family=binomial)
+coefficients(sex_glm)
+drop1(sex_glm, test="Chisq")
+```
+This model shows a very significant correlation between the age of the passenger and their outcome; Male passengers were much more likely to die in the accident then female ones. The odds of a male passenger surviving are 
+```{R}
+exp(0.69315-2.30118)
+```
+while for female passengers, the odds are
+```{R}
+exp(0.69315)
+```
+giving the female passengers two to one odds of surviving the crash.
+
+### Class
+```{R}
+cls_glm <- glm(Survived ~ PClass, data = data, family=binomial)
+summary(cls_glm, test="Chisq")
+```
+This model shows that there is a significant relation between whether the passenger in question was a first, second or third class passenger. The model shows very high correlation between the class factor and the survival outcome. The odds for first class passengers are higher than those of second, and especially third class passengers, as can be seen here:
+```{R}
+exp(0.4029) # First class passengers
+exp(0.4029-0.7052) # Second class passengers
+exp(0.4029-1.8265) # Third class passengers
+```
+The first class passengers have approximately three to two odd of surviving the crash, giving those passengers a higher than 50% chance. For the lower classes, this chance is much lower, with third class passengers only having a one in four chance of survival.
+
+## Part B 
+In the previous section, the logistic regresion models between Survival and Sex, and Survival and PClass were the most significant. We now want to refine these models, by looking at the interaction between these two factors and the Age numerical variable. Ideally, we want to use a model in which the factor and numerical value do not interact, as this makes modeling simpler. To test for this interaction, we can do
+
+### Sex and Age
+```{R}
+sexage_anova <- glm(Survived ~ Sex * Age, data = data_not_na, family=binomial)
+drop1(sexage_anova, test="Chisq")
+clsage_anova <- glm(Survived ~ PClass * Age, data = data_not_na, family=binomial)
+drop1(clsage_anova, test="Chisq")
+```
+The p-value for interaction between the sex and age of a passenger is below 0.05, making this interaction significant for their survival chances. The passsenger class and age, however, do not significantly interact. We can therefore state that the Sex factor and Age numerical varialbe interact, whereas PClass and Age do not. This makes The PClass and Age model more suited for further analysis. 
+```{R}
+chosen_glm <- glm(Survived ~ PClass + Age, data = data_not_na, family=binomial)
+summary(chosen_glm)
+```
+With this model, we can now predict the probability of survival for a passenger of age 55 in each passenger class with both sexes. Firstly, our chosen model does not consider the sex of the passenger as a factor in their outcome, meaning that a distinction does not have to be made between male and female passengers. For the passenger classes, we can use the `predict()` function from R to get
+```{R}
+new_data = data.frame(Name = c("Class, First", "Class, Second", "Class, Third"),
+                      Age = c(55, 55, 55), PClass = c("1st", "2nd", "3rd") )
+chosen_prediction <- predict(chosen_glm, new_data, type="response")
+```
+The obtained chance of survival for a first class passenger is 48%, for a second class passenger this becomes 23%, and a third class passenger only has a 9.9% of survival.
+
+## Part D 
+Another way to predict the survival chance could be to apply a contingency table test on the data. We can then investigate whether the class and sex factors affect the survival status. 
+```{R}
+chisq_cls <- chisq.test(xtabs(~Survived+PClass, data = data))
+chisq_cls$observed
+chisq_cls$expected
+chisq_cls
+residuals(chisq_cls)
+```
+This contingency test has a p-value of less than 0.05, which indicates that the passenger class does affect the survival status. 
+
+Because the Sex and Survived factors form a two by two matrix, we can use the Fisher test on this set:
+```{R}
+fisher.test(xtabs(~Survived+Sex, data = data))
+```
+This test has a p-value of less than 0.05, meaning that the effect between Survived and Sex is also significant.
 
 ```{r, echo=F}
 # nolint end

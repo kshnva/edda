@@ -1,8 +1,8 @@
 ---
-title: "EDDA assignment 3"
-output:
-  pdf_document: default
+title: "Exercise 3"
+output: pdf_document
 ---
+# Exercise 3
 ```{r setup, include=FALSE} 
 knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
 ```
@@ -162,8 +162,3 @@ plot
 
 25 lies outside of our confidence interval for theta1. The limited model where theta1 = 25 is fixed shows a much higher residual sum of squares. The model is now also underestimating Time for Weights of (50, 100), only accurately representing the datapoints from Wt=20.
 Additionally, the Q-Q plot is now skewed slightly. Therefore we conclude that the theta1=25 model does not represent the data well.
-
-
-
-
-
