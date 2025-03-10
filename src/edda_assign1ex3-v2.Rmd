@@ -1,0 +1,189 @@
+---
+title: "NPK Agricultural Experiment Analysis"
+output:
+  pdf_document: default
+---
+
+Import all necessary packages needed to run the code
+
+```{r packages}
+library(MASS)
+library(ggplot2)
+library(dplyr)
+library(lme4)
+data(npk)
+```
+
+```{r, echo=FALSE}
+set.seed(82)
+```
+
+### 3,A Randomize distribution of Soil
+
+Create a dataframe to represent the randomized distribution of soil additives among the plots in each block. Each block contains four plots, and the code randomly assigns the additives while adhering to the experimental constraints.
+
+```{r, echo=FALSE}
+n_blocks <- 6
+n_plots <- 4
+
+
+random_distributed <- data.frame(
+  block = rep(1:n_blocks, each = n_plots),
+  plot = rep(1:n_plots, times = n_blocks),
+  N = 0, P = 0, K = 0
+)
+
+
+for (block in 1:n_blocks) {
+  idx <- (n_plots * (block - 1) + 1):(n_plots * block)
+  
+  shuffled_idx <- sample(idx)
+  
+  random_distributed[shuffled_idx[1:2], "N"] <- 1
+  random_distributed[shuffled_idx[3:4], "P"] <- 1
+  random_distributed[shuffled_idx[c(1,3)], "K"] <- 1
+}
+
+View(random_distributed)
+```
+
+### 3.B Average Yield Analysis by Block and Nitrogen Treatment
+
+Groups the `npk` dataset by block and Nitrogen treatment, calculates the average yield for each group, and then creates a bar plot to compare the average yields for plots with and without Nitrogen.
+
+```{r, echo=FALSE}
+# Group npk data by block and N
+avg_yield_block <- npk %>%
+  group_by(block, N) %>%
+  summarise(Average_Yield = mean(yield), .groups = "keep")
+
+# Create bar plot
+avg_yield_plot <- ggplot(avg_yield_block, 
+                         aes(x = factor(block), y = Average_Yield, fill = factor(N))) + 
+  geom_bar(stat = "identity", position = "dodge", width = 0.6) +  # Adjust bar width
+  labs(x = "Block Number", y = "Average Yield", fill = "Nitrogen") +
+  ggtitle("Average Yield per Block, for Nitrogen Treatment") +
+  scale_fill_manual(values = c("0" = "red", "1" = "green"), labels = c("No Nitrogen", "With Nitrogen")) + 
+  theme_minimal(base_size = 14) 
+
+```
+
+```{r, echo=FALSE}
+print(avg_yield_plot)
+```
+
+It can be inferred from the box plot that the Blocks having nitrogen have more average yield than the ones without nitrogen
+
+```{r, echo=FALSE}
+t_test_result <- t.test(yield ~ N, data = npk)
+print(t_test_result)
+```
+
+The p-value of 0.02218 is below the standard alpha level of 0.05, indicating a statistically significant difference in mean yield between the nitrogen treatment group (N=1) and the control group without nitrogen (N=0).
+
+### 3.C Conduct 2-way ANOVA
+
+```{r, echo=FALSE}
+# Conducting a 2-way ANOVA with yield as the response variable and factors block and N
+anova_model <- aov(yield ~ block + N, data = npk)
+summary(anova_model)
+
+# Checking for interaction effects
+interaction_model <- aov(yield ~ block * N, data = npk)
+summary(interaction_model)
+```
+
+The p-value for the block effect is 0.0262, which is less than 0.05. This indicates that there is a statistically significant effect of the block on the yield. The p-value for nitrogen is 0.0071, which is also less than 0.05. This indicates a statistically significant effect of nitrogen treatment on the yield. So we can concur that both block and nitrogen are important factors in influencing the yield of peas, and applying Nitrogen improves the yield. However the block doesnot change the effect of nitrogen.
+
+Including block as a fixed effect in the ANOVA is not advisable due to the incomplete block design, which violates the assumption of balanced replication across factor levels. This can lead to misleading results. Blocks are not of theoretical interest in this experiment; rather, they function as experimental units to reduce variability. Thus, treating them as fixed effects may obscure true treatment effects.
+
+The Friedman test is not appropriate for the npk dataset since it is intended for complete block designs, where every block includes all treatments.The npk dataset utilizes an incomplete block design hence the Friedman test is not valid
+
+### 3.D Choosing favourite Model
+
+```{r, echo=FALSE}
+
+nitrogen_phosphorus_anova <- aov(yield ~ N * P + block, data = npk)
+print(anova(nitrogen_phosphorus_anova))
+
+
+nitrogen_potassium_anova <- aov(yield ~ N * K + block, data = npk)
+print(anova(nitrogen_potassium_anova))
+
+
+phosphorus_potassium_anova <- aov(yield ~ P * K + block, data = npk)
+print(anova(phosphorus_potassium_anova))
+
+
+phosphorus_anova <- aov(yield ~ P + block, data = npk)
+print(anova(phosphorus_anova))
+
+potassium_anova <- aov(yield ~ K + block, data = npk)
+print(anova(potassium_anova))
+
+
+```
+
+Nitrogen and Potassium treatments significantly affect yield while phosphorous does not. The block factor significantly influences yield in multiple models. Interactions between treatments donot appear significant, suggesting the effects of N and K donot depend upon each other. Since we have significant factors like N and K , we should conduct post-hoc tests to explore which specific treatment levels differ
+
+```{r, echo=FALSE}
+ggplot(npk, aes(x = P, y = yield, color = block, group = block)) +
+    stat_summary(fun = mean, geom = "point", size = 4, shape = 21, fill = "red") +
+    stat_summary(fun = mean, geom = "line", lwd = 1.5, alpha = 0.8) +
+    labs(title = "Interaction Plot: Phosphate (P) Effect on Yield",
+         x = "Phosphate (P) Concentration", 
+         y = "Mean Yield",
+         color = "Block") + 
+    theme_minimal(base_size = 15) +
+    theme(
+        legend.position = "right",
+        legend.justification = "top",
+        legend.margin = margin(0, 10, 0, 0),
+        legend.box.margin = margin(0, 10, 0, 0),
+        panel.grid.major = element_line(color = "lightgray"),
+        panel.grid.minor = element_blank()
+    )
+
+
+```
+
+```{r, echo=FALSE}
+
+best_model <- aov(yield ~ N + K + block, data = npk)
+summary(best_model)
+```
+
+### 3.E Investigate Influence of Factors on Yield
+
+```{r, echo=FALSE}
+yield_summary <- npk %>%
+  group_by(N, K) %>%
+  summarise(mean_yield = mean(yield), .groups = "drop") %>%
+  arrange(desc(mean_yield))
+```
+
+```{{r, echo=FALSE}
+ggplot(yield_summary, aes(x = factor(N), y = mean_yield, fill = factor(K))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Mean Yield by Nitrogen and Potassium Levels",
+       x = "Nitrogen (N) Level",
+       y = "Mean Yield",
+       fill = "Potassium (K) Level") +
+  theme_minimal()
+```
+
+```{r, echo=FALSE}
+print(yield_summary)
+```
+
+As it can be seen Potassium K has a negative effect on the mean_yield and Nitrogen N has a positive effect on the mean yield. Hence the combination of factors that lead to the best yield is N = 1 and K= 0
+
+### 3.F Mixed Effect Analysis for the model
+
+```{r, echo=FALSE}
+mixed_model <- lmer(yield ~ N + K + (1 | block), data = npk)
+summary(mixed_model)
+
+```
+
+The mixed effects model shows that nitrogen significantly increases yield (estimate of 5.617), while potassium decreases it (estimate of -3.983). The block factor accounts for variability in yield(having a variance of 13.28), indicating inherent differences across blocks.

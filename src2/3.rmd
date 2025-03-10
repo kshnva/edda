@@ -1,0 +1,169 @@
+---
+title: "EDDA assignment 3"
+output:
+  pdf_document: default
+---
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+Import all necessary packages needed to run the code
+
+```{r packages}
+library(MASS)
+library(ggplot2)
+library(dplyr)
+library(lme4)
+data(stormer)
+set.seed(42)
+```
+
+# a)
+We apply nonlinear regression to the given formula: first we solve the linear formula, then use the resulting parameters as an initial guess to the nonlinear regression. Since the linear model is already very close, nonlinear regression only needs 2 iterations.
+```{r, echo=FALSE}
+form=as.formula(Wt*Time~ Viscosity + Time)
+lin_model = lm(form, data=stormer)
+lin_model
+```
+
+
+
+```{r, fig.height=3, fig.width=6}
+
+t_lin = lin_model$coefficients
+initial = c(theta1 = unname(t_lin[2]), theta2=unname(t_lin[3]))
+form=as.formula(Time~ (theta1*Viscosity)/(Wt - theta2))
+nmodel = nls(form, data=stormer,start=initial)
+summary(nmodel)
+confint(nmodel)
+deviance(nmodel)
+```
+```{r, echo=FALSE, fig.height=3, fig.width=6}
+
+theta_fit = coef(nmodel)
+f_fit20 = function(v){
+  (theta_fit[1]*v)/(20 - theta_fit[2])
+}
+f_fit50 = function(v){
+  (theta_fit[1]*v)/(50 - theta_fit[2])
+}
+f_fit100 = function(v){
+  (theta_fit[1]*v)/(100 - theta_fit[2])
+}
+plot = ggplot(stormer, aes(x=Viscosity, y=Time, color=Wt)) + geom_point()
+plot = plot + stat_function(fun=f_fit20) +
+        stat_function(fun=f_fit50) +
+        stat_function(fun=f_fit100)
+
+plot
+qqnorm(resid(nmodel)); qqline(resid(nmodel),col="red")
+sig2 = c(sigma_squared=sum(resid(nmodel) * resid(nmodel)) / (nrow(stormer) - 2)); 
+print(sig2)
+```
+From visual inspection, the model fit looks accurate. The residuals also appear to follow an normal distribution as suggested by the qq-plot. The variance of e is computed above, and shows that there is significant measurement error in the data. 
+
+
+
+
+
+
+
+
+
+# c)
+Assuming Asymptotic normality, whe can compute the confidence intervals for theta using the student distribution with N-2 degrees of freedom and the square root of the diagonals of the covariance matrix:
+```{r}
+
+cov.est=vcov(nmodel);cov.est
+coef(nmodel)
+alpha = 0.08
+for (i in 1:2){
+  ci = coef(nmodel)[i]-qt(c(alpha/2,1-alpha/2),23-2)*sqrt(cov.est[i,i])
+  print(ci)
+}
+```
+
+
+
+# d)
+Similarly, we can get the confidence intervals for Time(Viscosity) at a constant Wt. For this we compute the gradient of our function at each point and assume a linear response.
+```{r, fig.height=3, fig.width=6}
+alpha=0.006
+grad50 = function(v, theta){
+  rbind(theta[1]/(50 - theta[2]),
+        (-theta[1]*v)/((50-theta[2])*(50-theta[2]))
+        )
+}
+v3 = function(v) grad50(v, coef(nmodel))
+cov.est
+se = function(v) sqrt(t(v3(v)) %*% cov.est %*% v3(v))
+ci = function(v) f_fit50(v) + (qt(c(alpha/2, 1-alpha/2),23) * (se(v)))
+ub = function(v) ci(v)[1]
+lb = function(v) ci(v)[2]
+
+test_v = seq(from=10, to=300, by=5)
+ub_data = numeric(length(test_v))
+lb_data = numeric(length(test_v))
+fv_data = numeric(length(test_v))
+for (i in 1:length(test_v)){
+  ub_data[i] = ub(test_v[i])
+  lb_data[i] = lb(test_v[i])
+  fv_data[i] = f_fit50(test_v[i])
+}
+plot_data = data.frame(
+  v = test_v,
+  ub = ub_data,
+  lb = lb_data,
+  ub1 = ub_data,
+  lb1 = lb_data,
+  fv = fv_data
+)
+
+
+plot = ggplot() + 
+  geom_point(data=stormer, aes(x=Viscosity, y=Time, color=Wt)) +
+  geom_ribbon(data=plot_data, aes(x=test_v,  ymin=lb, ymax=ub), fill = "lightblue",alpha=0.5)+
+  geom_line(data=plot_data, aes(x=test_v,y=fv))
+
+plot
+```
+
+
+# b), e)
+
+```{r, echo=FALSE, fig.height=3, fig.width=6}
+
+initial = c(theta2=2)
+form_limited =as.formula(Time~ (25*Viscosity)/(Wt - theta2))
+model = nls(form_limited, data=stormer,start=initial)
+summary(model)
+
+qqnorm(resid(model)); qqline(resid(model),col="red")
+sig2 = sum(resid(model) * resid(model)) / (nrow(stormer) - 2); sig2
+
+
+theta2 = coef(model)[1]
+
+f_fit20l = function(v){
+  (25*v)/(20 - theta2)
+}
+f_fit50l = function(v){
+  (25*v)/(50 - theta2)
+}
+f_fit100l = function(v){
+  (25*v)/(100 - theta2)
+}
+plot = ggplot(stormer, aes(x=Viscosity, y=Time, color=Wt)) + geom_point()
+plot = plot + stat_function(fun=f_fit20l) +
+  stat_function(fun=f_fit50l) +
+  stat_function(fun=f_fit100l)
+
+plot
+```
+
+25 lies outside of our confidence interval for theta1. The limited model where theta1 = 25 is fixed shows a much higher residual sum of squares. The model is now also underestimating Time for Weights of (50, 100), only accurately representing the datapoints from Wt=20.
+Additionally, the Q-Q plot is now skewed slightly. Therefore we conclude that the theta1=25 model does not represent the data well.
+
+
+
+
+
