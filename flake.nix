@@ -35,6 +35,9 @@
             ggplot2
             dplyr
             bookdown
+            tidyverse
+            broom
+            gt
           ]);
         shellHook = ''
           mkdir -p .vscode
